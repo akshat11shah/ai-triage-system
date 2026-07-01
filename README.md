@@ -102,33 +102,12 @@ GROQ_API_KEY=gsk_your_api_key_here
 * **TriageResult:** Stores AI telemetry, final JSON classifications, cost, latency, and the generated Draft Auto-Reply.
 * **KBArticle:** Stores company policies used dynamically by the AI to resolve tickets without hallucinating.
 
-# 13. API (Optional)
-The system exposes several internal AJAX REST endpoints to power the Vanilla JS frontend without page reloads:
-* `POST /triage/api/triage/single/` - Runs triage on a specific message.
-* `POST /triage/api/generate_reply/` - Uses LLM to draft an email based on KB policies.
-* `GET /triage/api/dashboard_stats/` - Polls live telemetry data.
-
-# 14. Future Enhancements
+# 13. Future Enhancements
 * Implementing a "Multi-Cloud Router" to instantly fallback to OpenAI's GPT-4o-mini before reverting to the local ML model.
 * Integrating IMAP/SMTP to fetch real emails directly into the dashboard.
 
-# 15. Known Issues
+# 14. Known Issues
 * Requires a highly reliable internet connection for sub-second latency. If offline, the ML Fallback model requires at least 5 previously triaged messages in the database to train successfully.
 
-# 16. Contributing
+# 15. Contributing
 Contributions are welcome. Please open an issue first to discuss what you would like to change.
-
-# 17. License
-This project is licensed under the MIT License.
-
-# 18. Author
-**Akshat Shah**
-* [GitHub Profile](https://github.com/akshat11shah)
-
-# 19. Acknowledgements
-* Built for the 2026 Company Hackathon.
-* Powered by [Groq](https://groq.com/) for lightning-fast inference.
-* Llama 3 created by Meta.
-
-# 20. Version History
-* **v1.0.0** - Initial Hackathon Release (Agentic Tooling, ML Fallback, Dashboard)

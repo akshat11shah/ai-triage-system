@@ -12,10 +12,10 @@ The Agentic AI Triage System is an enterprise-grade customer support pipeline de
 * **Multilingual Translation:** Automatically detects and translates non-English customer inputs.
 
 # 4. Screenshots
-> *(Add your screenshots here before final submission!)*
-* `![Dashboard View](placeholder)`
-* `![Triage JSON Output](placeholder)`
-* `![Auto-Reply Draft](placeholder)`
+<img width="888" height="860" alt="image" src="https://github.com/user-attachments/assets/49d0e69b-6051-459e-a637-6fb8086dcec8" />
+<img width="1152" height="873" alt="image" src="https://github.com/user-attachments/assets/b0dcb493-47c3-4368-94f3-9860c34f08c2" />
+<img width="1146" height="711" alt="image" src="https://github.com/user-attachments/assets/23d0b866-399d-43a5-a1b7-52d38d45ac0d" />
+
 
 # 5. Tech Stack
 * **Backend:** Python, Django 4.2+

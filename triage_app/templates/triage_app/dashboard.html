@@ -1,0 +1,768 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Customer Message Triage Dashboard</title>
+    <!-- Google Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'triage_app/styles.css' %}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header>
+            <div class="brand-section">
+                <h1>AI Customer Message <span>Triage System</span></h1>
+                <p>Enterprise triage pipeline for unstructured, sarcastic, multilingual customer requests.</p>
+            </div>
+            <div class="actions-section">
+                <!-- <button id="import-excel-btn" class="btn btn-secondary">Import Excel</button> -->
+                <a href="{% url 'run_eval' %}" class="btn btn-primary eval-btn-header">Run Accuracy Test</a>
+            </div>
+        </header>
+
+        <!-- Django Alert Messages -->
+        {% if messages %}
+            <ul class="django-messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Total Messages</div>
+                <div class="stat-value">{{ total_messages_count }}</div>
+                <div class="stat-desc">From all input channels</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Triaged by AI</div>
+                <div class="stat-value">{{ triaged_count }}</div>
+                <div class="stat-desc">Structured outputs captured</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">P0 Critical Alerts</div>
+                <div class="stat-value" style="color: var(--p0-text);">{{ p0_count }}</div>
+                <div class="stat-desc">Urgent response required</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Needs Human Review</div>
+                <div class="stat-value" style="color: var(--human-text);">{{ needs_human_count }}</div>
+                <div class="stat-desc">Low confidence or vague</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Avg Confidence</div>
+                <div class="stat-value">{{ avg_confidence }}%</div>
+                <div class="stat-desc">Classifier certainty avg</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Avg Latency</div>
+                <div class="stat-value">{{ avg_latency }}s</div>
+                <div class="stat-desc">End-to-end response time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Total Cost</div>
+                <div class="stat-value">${{ total_cost }}</div>
+                <div class="stat-desc">Gemini token expenditure</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="dashboard-layout">
+            
+            <!-- Left Column: Triage Input & Evaluation Metrics -->
+            <div class="left-column">
+                
+                <!-- Manual Triage Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Triage Single Message</h2>
+                    </div>
+                    <div class="card-body">
+                        <form id="triage-single-form" action="{% url 'triage_single' %}" method="post">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="message_text" class="form-label">Customer Query</label>
+                                <textarea name="text" id="message_text" rows="4" class="form-control" placeholder="Type or paste messy customer message here (try non-English, angry, sarcastic, or prompt injection)..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="source" class="form-label">Message Source</label>
+                                <select name="source" id="source" class="form-control">
+                                    <option value="Web Dashboard">Web Dashboard</option>
+                                    <option value="Email Support">Email Support</option>
+                                    <option value="Chat App">Chat App</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="width: 100%;">Analyze & Triage</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Dynamic Knowledge Base Articles Card -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 class="card-title">Knowledge Base Manager</h2>
+                        <button id="add-kb-btn" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">+ Add Article</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="kb-list-container" style="max-height: 350px; overflow-y: auto; margin-bottom: 1rem; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.5rem; background: #fafafa;">
+                            {% if kb_articles %}
+                                {% for art in kb_articles %}
+                                    <div class="kb-item-row" id="kb-item-{{ art.id }}" style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+                                        <div style="flex: 1;">
+                                            <div style="font-family: monospace; font-weight: bold; color: var(--primary); font-size: 0.85rem;">{{ art.key }}</div>
+                                            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">{{ art.content }}</div>
+                                        </div>
+                                        <div style="display: flex; gap: 0.25rem; align-items: center;">
+                                            <button class="btn btn-secondary edit-kb-btn" data-id="{{ art.id }}" data-key="{{ art.key }}" data-content="{{ art.content }}" style="font-size: 0.7rem; padding: 0.15rem 0.35rem; min-height: auto;">Edit</button>
+                                            <button class="btn btn-danger delete-kb-btn" data-id="{{ art.id }}" style="font-size: 0.7rem; padding: 0.15rem 0.35rem; min-height: auto;">Delete</button>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <div id="kb-empty-msg" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1rem;">No Knowledge Base articles found.</div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Add/Edit Form (Collapsible/Hidden by default) -->
+                        <div id="kb-form-container" style="display: none; border-top: 1px dashed var(--border-color); padding-top: 1rem;">
+                            <h4 id="kb-form-title" style="font-size: 0.9rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">Add New KB Article</h4>
+                            <form id="kb-manage-form" action="{% url 'manage_kb_article' %}" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="id" id="kb_article_id" value="">
+                                
+                                <div class="form-group" style="margin-bottom: 0.75rem;">
+                                    <label class="form-label" for="kb_key" style="font-size: 0.8rem;">Search Key / Keyword</label>
+                                    <input type="text" name="key" id="kb_key" class="form-control" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" placeholder="e.g. pending payment" required>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0.75rem;">
+                                    <label class="form-label" for="kb_content" style="font-size: 0.8rem;">Article Content Guidelines</label>
+                                    <textarea name="content" id="kb_content" rows="3" class="form-control" style="padding: 0.4rem 0.6rem; font-size: 0.8rem;" placeholder="e.g. Policy: Bank transfer payments take up to 24 hours..." required></textarea>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                    <button type="button" id="kb-cancel-btn" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Cancel</button>
+                                    <button type="submit" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Save Article</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Messages Feed -->
+            <div class="right-column" id="messages-feed-container">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Customer Message Feed</h2>
+                        {% if unprocessed_count > 0 %}
+                            <a href="{% url 'triage_batch' %}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Triage Unprocessed ({{ unprocessed_count }})</a>
+                        {% endif %}
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Sr. No.</th>
+                                        <th>Message</th>
+                                        <th>Source</th>
+                                        <th>Priority</th>
+                                        <th>Human Rev.</th>
+                                        <th>Conf.</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for msg in messages_list %}
+                                        <tr>
+                                            <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                                            <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ msg.text }}">
+                                                {{ msg.text }}
+                                            </td>
+                                            <td><span style="font-size: 0.8rem; color: var(--text-secondary);">{{ msg.source }}</span></td>
+                                            <td>
+                                                {% if msg.triage %}
+                                                    <span class="badge badge-{{ msg.triage.final_priority|lower }}">
+                                                        {{ msg.triage.final_priority }}
+                                                    </span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if msg.triage %}
+                                                    {% if msg.triage.final_needs_human %}
+                                                        <span class="badge badge-human">Needs Human</span>
+                                                    {% else %}
+                                                        <span class="badge badge-success" style="background-color: #f0fdf4; color: #166534; border-color: #bbf7d0;">Auto</span>
+                                                    {% endif %}
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if msg.triage %}
+                                                    <span style="font-weight: 600;">{{ msg.triage.confidence|floatformat:2 }}</span>
+                                                {% else %}
+                                                    -
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{% url 'message_detail' msg.id %}" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Open</a>
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                                No customer messages in the database. Click "Seed Mock Dataset" to load the 40 message data table.
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination Controls -->
+                        {% if page_obj.has_other_pages %}
+                        <div style="padding: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                                Showing page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                            </div>
+                            <div style="display: flex; gap: 0.5rem;">
+                                {% if page_obj.has_previous %}
+                                    <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary pagination-btn" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Previous</a>
+                                {% endif %}
+                                
+                                {% if page_obj.has_next %}
+                                    <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary pagination-btn" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">Next</a>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- AJAX Dynamic Scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // CSRF Token Helper
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            const csrftoken = getCookie('csrftoken');
+
+            // Update Stats UI
+            function updateStats(stats) {
+                // Update stats cards values
+                const valCards = document.querySelectorAll('.stat-value');
+                if (valCards.length >= 7) {
+                    valCards[0].textContent = stats.messages_list.length; // Total Messages
+                    valCards[1].textContent = stats.triaged_count; // Triaged by AI
+                    valCards[2].textContent = stats.p0_count; // P0 Critical
+                    valCards[3].textContent = stats.needs_human_count; // Needs Human
+                    valCards[4].textContent = stats.avg_confidence + '%'; // Avg Conf
+                    valCards[5].textContent = stats.avg_latency + 's'; // Avg Latency
+                    valCards[6].textContent = '$' + stats.total_cost; // Total Cost
+                }
+
+                // Rebuild Table
+                const tbody = document.querySelector('.table tbody');
+                if (stats.messages_list.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                No customer messages in the database. Click "Seed Mock Dataset" to load the mock data.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                stats.messages_list.forEach((msg, idx) => {
+                    let priorityBadge = '-';
+                    if (msg.priority) {
+                        priorityBadge = `<span class="badge badge-${msg.priority.toLowerCase()}">${msg.priority}</span>`;
+                    }
+
+                    let humanBadge = '-';
+                    if (msg.needs_human !== null) {
+                        if (msg.needs_human) {
+                            humanBadge = '<span class="badge badge-needs-review">Needs Human Review</span>';
+                        } else {
+                            humanBadge = '<span class="badge badge-auto-resolved">Auto-Resolved</span>';
+                        }
+                    }
+
+                    let confText = '-';
+                    if (msg.confidence !== null) {
+                        confText = `<span style="font-weight: 600;">${msg.confidence}%</span>`;
+                    }
+
+                    html += `
+                        <tr>
+                            <td>${idx + 1}</td>
+                            <td style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${msg.text}">
+                                ${msg.text}
+                            </td>
+                            <td><span style="font-size: 0.8rem; color: var(--text-secondary);">${msg.source}</span></td>
+                            <td>${priorityBadge}</td>
+                            <td>${humanBadge}</td>
+                            <td>${confText}</td>
+                            <td>
+                                <a href="${msg.detail_url}" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">Open</a>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            }
+
+            // Handle Seeding Mock Dataset
+            const seedBtns = document.querySelectorAll('.seed-btn');
+            seedBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Seeding...';
+                    btn.style.opacity = '0.7';
+
+                    fetch(btn.href, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        btn.textContent = originalText;
+                        btn.style.opacity = '1';
+                        
+                        // Update loaded badge
+                        const badge = document.querySelector('.actions-section .badge');
+                        if (badge) {
+                            badge.textContent = 'Dataset Loaded (' + data.stats.messages_list.length + ' Rows)';
+                            badge.className = 'badge badge-success';
+                        } else {
+                            const newBadge = document.createElement('span');
+                            newBadge.className = 'badge badge-success';
+                            newBadge.textContent = 'Dataset Loaded (' + data.stats.messages_list.length + ' Rows)';
+                            btn.parentNode.insertBefore(newBadge, btn);
+                        }
+                        
+                        updateStats(data.stats);
+                    })
+                    .catch(err => {
+                        btn.textContent = originalText;
+                        btn.style.opacity = '1';
+                        console.error(err);
+                    });
+                });
+            });
+
+            // Handle Manual Triage Form Submission
+            const triageForm = document.getElementById('triage-single-form');
+            if (triageForm) {
+                triageForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const btn = triageForm.querySelector('button[type="submit"]');
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Analyzing...';
+                    btn.disabled = true;
+
+                    const formData = new FormData(triageForm);
+
+                    fetch(triageForm.action, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        triageForm.reset();
+                        updateStats(data.stats);
+                    })
+                    .catch(err => {
+                        btn.textContent = originalText;
+                        btn.disabled = false;
+                        console.error(err);
+                    });
+                });
+            }
+
+            // Handle E2E Evaluation Run (Both Header Button and Left Card Button)
+            function setupEvalButton(btn) {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const originalText = btn.textContent;
+                    btn.textContent = 'Evaluating...';
+                    btn.style.opacity = '0.7';
+
+                    fetch(btn.href, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        btn.textContent = originalText;
+                        btn.style.opacity = '1';
+
+                        // Update L3 Ground Truth card body
+                        const cardBody = document.getElementById('eval-card-body');
+                        if (cardBody && data.eval_metrics) {
+                            const m = data.eval_metrics;
+                            let failuresHtml = '';
+                            if (m.failures && m.failures.length > 0) {
+                                failuresHtml = '<div class="eval-failures-list"><h4 style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 0.5rem;">Sample Disagreements:</h4>';
+                                m.failures.forEach(fail => {
+                                    failuresHtml += `
+                                        <div class="eval-failure-item">
+                                            <div class="eval-failure-text">"${fail.message.substring(0, 60)}..."</div>
+                                            <div style="margin-top: 0.25rem;">
+                                                <strong>Expected:</strong> Cat: ${fail.expected.category}, Pri: ${fail.expected.priority}, Human: ${fail.expected.needs_human}<br>
+                                                <strong>AI Actual:</strong> Cat: ${fail.actual.category}, Pri: ${fail.actual.priority}, Human: ${fail.actual.needs_human}
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                                failuresHtml += '</div>';
+                            } else {
+                                failuresHtml = `
+                                    <div class="badge badge-success" style="width: 100%; display: flex; justify-content: center; margin-top: 1rem; padding: 0.5rem;">
+                                        100% agreement with Ground Truth!
+                                    </div>
+                                `;
+                            }
+
+                            cardBody.innerHTML = `
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Total Test Cases</span>
+                                    <span class="eval-metric-val">${m.num_cases}</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Overall Accuracy</span>
+                                    <span class="eval-metric-val" style="font-size: 1.1rem; color: #166534;">${m.overall_agreement}%</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Category Accuracy</span>
+                                    <span class="eval-metric-val">${m.category_accuracy}%</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Priority Accuracy</span>
+                                    <span class="eval-metric-val">${m.priority_accuracy}%</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Needs Human Accuracy</span>
+                                    <span class="eval-metric-val">${m.needs_human_accuracy}%</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Avg Response Time</span>
+                                    <span class="eval-metric-val">${m.avg_latency}s</span>
+                                </div>
+                                <div class="eval-metric-row">
+                                    <span class="eval-metric-lbl">Total Evaluation Cost</span>
+                                    <span class="eval-metric-val">$${m.total_cost}</span>
+                                </div>
+                                ${failuresHtml}
+                                <a id="run-eval-btn" href="${btn.href}" class="btn btn-secondary" style="width: 100%; margin-top: 0.5rem;">Run Accuracy Test</a>
+                            `;
+                            // Re-bind the newly injected button inside card body
+                            const newBtn = document.getElementById('run-eval-btn');
+                            if (newBtn) setupEvalButton(newBtn);
+                        }
+                    })
+                    .catch(err => {
+                        btn.textContent = originalText;
+                        btn.style.opacity = '1';
+                        console.error(err);
+                    });
+                });
+            }
+
+            const evalBtns = document.querySelectorAll('.eval-btn-header, a[href*="run-eval"]');
+            evalBtns.forEach(setupEvalButton);
+
+            // ==========================================================
+            // Dynamic Knowledge Base Management Script
+            // ==========================================================
+            const addKbBtn = document.getElementById('add-kb-btn');
+            const kbFormContainer = document.getElementById('kb-form-container');
+            const kbFormTitle = document.getElementById('kb-form-title');
+            const kbManageForm = document.getElementById('kb-manage-form');
+            const kbCancelBtn = document.getElementById('kb-cancel-btn');
+            const kbListContainer = document.getElementById('kb-list-container');
+
+            // Form inputs
+            const kbArticleIdInput = document.getElementById('kb_article_id');
+            const kbKeyInput = document.getElementById('kb_key');
+            const kbContentInput = document.getElementById('kb_content');
+
+            // Toggle show form for Add
+            if (addKbBtn) {
+                addKbBtn.addEventListener('click', function() {
+                    kbArticleIdInput.value = '';
+                    kbKeyInput.value = '';
+                    kbContentInput.value = '';
+                    kbFormTitle.textContent = 'Add New KB Article';
+                    kbFormContainer.style.display = 'block';
+                    kbKeyInput.focus();
+                });
+            }
+
+            // Cancel click
+            if (kbCancelBtn) {
+                kbCancelBtn.addEventListener('click', function() {
+                    kbFormContainer.style.display = 'none';
+                    kbArticleIdInput.value = '';
+                    kbKeyInput.value = '';
+                    kbContentInput.value = '';
+                });
+            }
+
+            // Edit click bindings
+            function bindEditButtons() {
+                document.querySelectorAll('.edit-kb-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        const key = this.getAttribute('data-key');
+                        const content = this.getAttribute('data-content');
+
+                        kbArticleIdInput.value = id;
+                        kbKeyInput.value = key;
+                        kbContentInput.value = content;
+                        kbFormTitle.textContent = `Edit KB Article #${id}`;
+                        kbFormContainer.style.display = 'block';
+                        kbKeyInput.focus();
+                    });
+                });
+            }
+
+            // Delete click bindings
+            function bindDeleteButtons() {
+                document.querySelectorAll('.delete-kb-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const id = this.getAttribute('data-id');
+                        if (confirm('Are you sure you want to delete this Knowledge Base article?')) {
+                            const formData = new FormData();
+                            formData.append('id', id);
+                            formData.append('action', 'delete');
+
+                            fetch('{% url "manage_kb_article" %}', {
+                                method: 'POST',
+                                headers: {
+                                    'X-CSRFToken': csrftoken,
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: formData
+                            })
+                            .then(res => res.json())
+                            .then(data => {
+                                if (data.status === 'success') {
+                                    const row = document.getElementById(`kb-item-${id}`);
+                                    if (row) row.remove();
+                                    
+                                    // Check if empty
+                                    if (kbListContainer.children.length === 0 || (kbListContainer.children.length === 1 && kbListContainer.children[0].id === 'kb-empty-msg')) {
+                                        kbListContainer.innerHTML = '<div id="kb-empty-msg" style="text-align: center; color: var(--text-muted); font-size: 0.85rem; padding: 1rem;">No Knowledge Base articles found.</div>';
+                                    }
+                                } else {
+                                    alert('Error: ' + data.message);
+                                }
+                            })
+                            .catch(err => console.error(err));
+                        }
+                    });
+                });
+            }
+
+            // Submit Add/Edit form
+            if (kbManageForm) {
+                kbManageForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    const formData = new FormData(kbManageForm);
+                    const isEdit = kbArticleIdInput.value !== '';
+
+                    fetch(kbManageForm.action, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const art = data.article;
+                            if (isEdit) {
+                                // Update row in DOM
+                                const row = document.getElementById(`kb-item-${art.id}`);
+                                if (row) {
+                                    row.querySelector('div > div:first-child').textContent = art.key;
+                                    row.querySelector('div > div:last-child').textContent = art.content;
+                                    const editBtn = row.querySelector('.edit-kb-btn');
+                                    editBtn.setAttribute('data-key', art.key);
+                                    editBtn.setAttribute('data-content', art.content);
+                                }
+                            } else {
+                                // Remove empty msg if present
+                                const emptyMsg = document.getElementById('kb-empty-msg');
+                                if (emptyMsg) emptyMsg.remove();
+
+                                // Append new row to list
+                                const newRow = document.createElement('div');
+                                newRow.className = 'kb-item-row';
+                                newRow.id = `kb-item-${art.id}`;
+                                newRow.style.padding = '0.5rem';
+                                newRow.style.borderBottom = '1px solid var(--border-color)';
+                                newRow.style.display = 'flex';
+                                newRow.style.justifyContent = 'space-between';
+                                newRow.style.alignItems = 'flex-start';
+                                newRow.style.gap = '0.5rem';
+                                newRow.innerHTML = `
+                                    <div style="flex: 1;">
+                                        <div style="font-family: monospace; font-weight: bold; color: var(--primary); font-size: 0.85rem;">${art.key}</div>
+                                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.25rem;">${art.content}</div>
+                                    </div>
+                                    <div style="display: flex; gap: 0.25rem; align-items: center;">
+                                        <button class="btn btn-secondary edit-kb-btn" data-id="${art.id}" data-key="${art.key}" data-content="${art.content}" style="font-size: 0.7rem; padding: 0.15rem 0.35rem; min-height: auto;">Edit</button>
+                                        <button class="btn btn-danger delete-kb-btn" data-id="${art.id}" style="font-size: 0.7rem; padding: 0.15rem 0.35rem; min-height: auto;">Delete</button>
+                                    </div>
+                                `;
+                                kbListContainer.appendChild(newRow);
+                            }
+
+                            // Re-bind click events
+                            bindEditButtons();
+                            bindDeleteButtons();
+
+                            // Reset and hide form
+                            kbFormContainer.style.display = 'none';
+                            kbArticleIdInput.value = '';
+                            kbKeyInput.value = '';
+                            kbContentInput.value = '';
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(err => console.error(err));
+                });
+            }
+
+            // ==========================================================
+            // Excel Import Script
+            // ==========================================================
+            const importExcelBtn = document.getElementById('import-excel-btn');
+            const excelFileInput = document.getElementById('excel-file-input');
+
+            if (importExcelBtn && excelFileInput) {
+                importExcelBtn.addEventListener('click', function() {
+                    excelFileInput.click();
+                });
+
+                excelFileInput.addEventListener('change', function() {
+                    if (excelFileInput.files.length === 0) return;
+                    
+                    const file = excelFileInput.files[0];
+                    const originalText = importExcelBtn.textContent;
+                    importExcelBtn.textContent = 'Importing...';
+                    importExcelBtn.disabled = true;
+
+                    const formData = new FormData();
+                    formData.append('excel_file', file);
+
+                    fetch('{% url "import_excel" %}', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        importExcelBtn.textContent = originalText;
+                        importExcelBtn.disabled = false;
+                        excelFileInput.value = ''; // Reset file input
+                        
+                        if (data.status === 'success') {
+                            alert(data.message);
+                            updateStats(data.stats);
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(err => {
+                        importExcelBtn.textContent = originalText;
+                        importExcelBtn.disabled = false;
+                        excelFileInput.value = '';
+                        console.error(err);
+                        alert('An error occurred during import.');
+                    });
+                });
+            }
+
+            // Initial binding
+            bindEditButtons();
+            bindDeleteButtons();
+            
+            // AJAX Pagination Interceptor
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.pagination-btn')) {
+                    e.preventDefault();
+                    const url = e.target.closest('.pagination-btn').href;
+                    const container = document.getElementById('messages-feed-container');
+                    
+                    container.style.opacity = '0.5';
+                    fetch(url)
+                    .then(response => response.text())
+                    .then(html => {
+                        const parser = new DOMParser();
+                        const doc = parser.parseFromString(html, 'text/html');
+                        const newContainer = doc.getElementById('messages-feed-container');
+                        
+                        if (newContainer) {
+                            container.innerHTML = newContainer.innerHTML;
+                            container.style.opacity = '1';
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Pagination Error:', err);
+                        window.location.href = url; // Fallback to normal navigation
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

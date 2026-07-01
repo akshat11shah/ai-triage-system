@@ -1,0 +1,460 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Message #{{ message.id }} - Triage Detail</title>
+    <!-- Google Font Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'triage_app/styles.css' %}">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Breadcrumbs & Header -->
+        <div style="margin-bottom: 1.5rem;">
+            <a href="{% url 'dashboard' %}" class="btn btn-secondary" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">← Back to Dashboard</a>
+        </div>
+        
+        <header style="margin-bottom: 2rem; padding-bottom: 1rem;">
+            <div class="brand-section">
+                <h1>Message <span>#{{ sr_no }}</span></h1>
+                <p>Received via <strong>{{ message.source }}</strong> on {{ message.created_at }}</p>
+            </div>
+            <div class="actions-section">
+                {% if triage %}
+                    {% if triage.is_overridden %}
+                        <span class="badge badge-success">Human Override Active</span>
+                    {% else %}
+                        <span class="badge badge-success" style="background-color: var(--primary-light); color: var(--primary); border-color: #c7d2fe;">AI Classified</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Django Alert Messages -->
+        {% if messages %}
+            <ul class="django-messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <!-- Raw Message Text Box -->
+        <div class="card" style="margin-bottom: 2rem;">
+            <div class="card-header">
+                <h3 class="card-title" style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Raw Message Content</h3>
+            </div>
+            <div class="card-body">
+                <div class="raw-message-box">
+                    "{{ message.text }}"
+                </div>
+            </div>
+        </div>
+
+        {% if triage %}
+            <!-- Detail Grid Layout -->
+            <div class="detail-grid">
+                
+                <!-- Left Column: Triage Decisions & Tools Log -->
+                <div class="left-col">
+                    
+                    <!-- AI Triage Decision Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Triage Decisions</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="meta-item">
+                                <span class="meta-label">Category Decision:</span>
+                                <span class="meta-val" style="font-size: 1.05rem; color: var(--primary);">
+                                    {{ triage.final_category }}
+                                    {% if triage.is_overridden %}
+                                        <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {{ triage.category }})</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Priority:</span>
+                                <span class="meta-val">
+                                    <span class="badge badge-{{ triage.final_priority|lower }}" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">
+                                        {{ triage.final_priority }}
+                                    </span>
+                                    {% if triage.is_overridden %}
+                                        <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {{ triage.priority }})</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Human Intervention Required:</span>
+                                <span class="meta-val">
+                                    {% if triage.final_needs_human %}
+                                        <span class="badge badge-human" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">Needs Human</span>
+                                    {% else %}
+                                        <span class="badge badge-success" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">Auto Resolved</span>
+                                    {% endif %}
+                                    {% if triage.is_overridden %}
+                                        <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {% if triage.needs_human %}Yes{% else %}No{% endif %})</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">AI Confidence Score:</span>
+                                <span class="meta-val" style="font-size: 1.05rem;">{{ triage.confidence|floatformat:2 }}</span>
+                            </div>
+                            <div class="meta-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; padding-top: 1rem;">
+                                <span class="meta-label">Issue Summary:</span>
+                                <p id="decision-summary" style="font-size: 0.9rem; color: var(--text-secondary); background-color: #f8fafc; padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%;">
+                                    {{ triage.final_summary }}
+                                </p>
+                            </div>
+                            <div class="meta-item" style="flex-direction: column; align-items: flex-start; gap: 0.5rem; padding-top: 1rem;">
+                                <span class="meta-label">Suggested Resolution:</span>
+                                <p id="decision-resolution" style="font-size: 0.9rem; color: var(--text-secondary); background-color: #f8fafc; padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color); width: 100%;">
+                                    {{ triage.final_suggested_action }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agentic Tools execution Log Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Executed Agentic Tools</h2>
+                        </div>
+                        <div class="card-body">
+                            {% if tool_calls %}
+                                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                                    The AI classification engine invoked the following helper functions to query context before deciding on classification and actions:
+                                </p>
+                                {% for call in tool_calls %}
+                                    <div class="tool-log-item">
+                                        <div class="tool-log-item-header">
+                                            <span class="tool-name">fn {{ call.tool }}()</span>
+                                            <span class="tool-args">args: {{ call.args }}</span>
+                                        </div>
+                                        <div class="tool-result">{{ call.result }}</div>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <p style="font-size: 0.875rem; color: var(--text-muted); text-align: center; padding: 1.5rem;">
+                                    No tools were executed during this triage process. (This message was triaged directly using classification rules).
+                                </p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Raw AI JSON Output Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Raw AI JSON Output</h2>
+                        </div>
+                        <div class="card-body">
+                            <pre style="background-color: #0f172a; color: #38bdf8; font-family: monospace; font-size: 0.8rem; padding: 1rem; border-radius: var(--radius-sm); overflow-x: auto;">{{ formatted_json }}</pre>
+                        </div>
+                    </div>
+
+                    <!-- AI Draft Auto-Reply Card -->
+                    <div class="card" style="margin-top: 1.5rem;">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                            <h2 class="card-title">AI Draft Auto-Reply</h2>
+                        </div>
+                        <div class="card-body">
+                            <div id="draft-container">
+                                {% if triage.auto_reply_draft %}
+                                    <textarea class="form-control" rows="8" style="width: 100%; padding: 1rem; font-family: sans-serif; font-size: 0.9rem;">{{ triage.auto_reply_draft }}</textarea>
+                                {% else %}
+                                    <div style="text-align: center; padding: 2rem; background-color: var(--background); border-radius: var(--radius-sm); border: 1px dashed var(--border-color);">
+                                        <button id="generate-draft-btn" class="btn btn-primary" style="font-size: 1rem; padding: 0.75rem 1.5rem;">✨ Generate Draft Reply</button>
+                                        <p style="margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem;">The AI will write a professional email response incorporating the Knowledge Base.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Right Column: Overrides & Metadata -->
+                <div class="right-col">
+                    
+                    <!-- Human in the Loop Override Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Human-in-the-Loop Override</h2>
+                        </div>
+                        <div class="card-body">
+                            <form id="save-override-form" action="{% url 'override_triage' triage.id %}" method="post">
+                                {% csrf_token %}
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="override_category">Category</label>
+                                    <input type="text" id="override_category" name="category" class="form-control" 
+                                           value="{% if triage.is_overridden %}{{ triage.overridden_category }}{% else %}{{ triage.category }}{% endif %}" required>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="override_priority">Priority</label>
+                                    <select id="override_priority" name="priority" class="form-control">
+                                        {% for code, label in priority_choices %}
+                                            <option value="{{ code }}" {% if triage.is_overridden and triage.overridden_priority == code or not triage.is_overridden and triage.priority == code %}selected{% endif %}>
+                                                {{ label }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label class="form-label" for="override_summary">Issue Summary</label>
+                                    <textarea id="override_summary" name="summary" class="form-control" rows="3" required>{% if triage.is_overridden %}{{ triage.overridden_summary }}{% else %}{{ triage.summary }}{% endif %}</textarea>
+                                </div>
+
+                                <div class="form-group" style="margin-top: 1rem;">
+                                    <label class="form-label" for="override_suggested_action">Suggested Resolution</label>
+                                    <textarea id="override_suggested_action" name="suggested_action" class="form-control" rows="3" required>{% if triage.is_overridden %}{{ triage.overridden_suggested_action }}{% else %}{{ triage.suggested_action }}{% endif %}</textarea>
+                                </div>
+
+                                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem; margin-bottom: 1.5rem;">
+                                    <input type="checkbox" id="override_needs_human" name="needs_human" 
+                                           {% if triage.is_overridden and triage.overridden_needs_human or not triage.is_overridden and triage.needs_human %}checked{% endif %} 
+                                           style="width: auto; cursor: pointer;">
+                                    <label for="override_needs_human" style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); cursor: pointer; user-select: none;">
+                                        Require Human Review
+                                    </label>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary" style="width: 100%; margin-bottom: 0.75rem;">Save Human Override</button>
+                            </form>
+                            
+                            <div id="reset-form-container">
+                                {% if triage.is_overridden %}
+                                    <form id="reset-override-form" action="{% url 'override_triage' triage.id %}" method="post" style="margin-top: 0.75rem;">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="reset">
+                                        <button type="submit" class="btn btn-danger" style="width: 100%;">Reset to AI Original</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance and Execution Metrics Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Execution Metrics</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="meta-item">
+                                <span class="meta-label">Latency:</span>
+                                <span class="meta-val">{{ triage.latency|floatformat:3 }} seconds</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Prompt Tokens:</span>
+                                <span class="meta-val">{{ triage.prompt_tokens }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Completion Tokens:</span>
+                                <span class="meta-val">{{ triage.completion_tokens }}</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Estimated Cost:</span>
+                                <span class="meta-val" style="color: #166534; font-weight: bold;">${{ triage.cost|floatformat:6 }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        {% else %}
+            <div class="card">
+                <div class="card-body" style="text-align: center; padding: 3rem;">
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                        This message has not been triaged yet by the AI Engine.
+                    </p>
+                    <form action="{% url 'triage_single' %}" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="text" value="{{ message.text }}">
+                        <input type="hidden" name="source" value="{{ message.source }}">
+                        <button type="submit" class="btn btn-primary">Process and Triage Now</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <!-- AJAX Dynamic Override Scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // CSRF Token Helper
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+            const csrftoken = getCookie('csrftoken');
+
+            const saveForm = document.getElementById('save-override-form');
+            const resetFormContainer = document.getElementById('reset-form-container');
+
+            function handleOverrideSubmit(form, bodyData) {
+                const btn = form.querySelector('button[type="submit"]');
+                const originalText = btn.textContent;
+                btn.textContent = 'Saving...';
+                btn.disabled = true;
+
+                fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: bodyData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+
+                    if (data.status === 'success') {
+                        // 1. Update Header badge
+                        const headerBadgeSec = document.querySelector('.actions-section');
+                        if (data.is_overridden) {
+                            headerBadgeSec.innerHTML = '<span class="badge badge-success">Human Override Active</span>';
+                        } else {
+                            headerBadgeSec.innerHTML = '<span class="badge badge-success" style="background-color: var(--primary-light); color: var(--primary); border-color: #c7d2fe;">AI Classified</span>';
+                        }
+
+                        // 2. Update Triage Decisions text on screen
+                        const metaVals = document.querySelectorAll('.meta-val');
+                        if (metaVals.length >= 3) {
+                            // Category
+                            metaVals[0].innerHTML = `${data.category} ${data.is_overridden ? '<span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {{ triage.category }})</span>' : ''}`;
+                            // Priority
+                            metaVals[1].innerHTML = `
+                                <span class="badge badge-${data.priority.toLowerCase()}" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">
+                                    ${data.priority}
+                                </span>
+                                ${data.is_overridden ? '<span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {{ triage.priority }})</span>' : ''}
+                            `;
+                            // Human Review
+                            const badgeHtml = data.needs_human 
+                                ? '<span class="badge badge-human" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">Needs Human</span>'
+                                : '<span class="badge badge-success" style="font-size: 0.85rem; padding: 0.25rem 0.75rem;">Auto Resolved</span>';
+                            metaVals[2].innerHTML = `
+                                ${badgeHtml}
+                                ${data.is_overridden ? '<span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);"> (AI originally: {% if triage.needs_human %}Yes{% else %}No{% endif %})</span>' : ''}
+                            `;
+                        }
+
+                        // Update Summary and Suggested Resolution
+                        const summaryEl = document.getElementById('decision-summary');
+                        const resolutionEl = document.getElementById('decision-resolution');
+                        if (summaryEl) {
+                            summaryEl.textContent = data.summary;
+                        }
+                        if (resolutionEl) {
+                            resolutionEl.textContent = data.suggested_action;
+                        }
+
+                        // 3. Update Reset Form Visibility/State
+                        if (data.is_overridden) {
+                            resetFormContainer.innerHTML = `
+                                <form id="reset-override-form" action="${form.action}" method="post" style="margin-top: 0.75rem;">
+                                    <input type="hidden" name="action" value="reset">
+                                    <button type="submit" class="btn btn-danger" style="width: 100%;">Reset to AI Original</button>
+                                </form>
+                            `;
+                            setupResetForm();
+                        } else {
+                            resetFormContainer.innerHTML = '';
+                            // Restore original inputs
+                            document.getElementById('override_category').value = "{{ triage.category|escapejs }}";
+                            document.getElementById('override_priority').value = "{{ triage.priority|escapejs }}";
+                            document.getElementById('override_needs_human').checked = {% if triage.needs_human %}true{% else %}false{% endif %};
+                            document.getElementById('override_summary').value = "{{ triage.summary|escapejs }}";
+                            document.getElementById('override_suggested_action').value = "{{ triage.suggested_action|escapejs }}";
+                        }
+                    }
+                })
+                .catch(err => {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    console.error(err);
+                });
+            }
+
+            if (saveForm) {
+                saveForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    handleOverrideSubmit(saveForm, new FormData(saveForm));
+                });
+            }
+
+            function setupResetForm() {
+                const resetForm = document.getElementById('reset-override-form');
+                if (resetForm) {
+                    resetForm.addEventListener('submit', function(e) {
+                        e.preventDefault();
+                        handleOverrideSubmit(resetForm, new FormData(resetForm));
+                    });
+                }
+            }
+
+            setupResetForm();
+
+            // AI Draft Generation Handler
+            const generateDraftBtn = document.getElementById('generate-draft-btn');
+            if (generateDraftBtn) {
+                generateDraftBtn.addEventListener('click', function() {
+                    const originalText = generateDraftBtn.innerHTML;
+                    generateDraftBtn.innerHTML = '✨ Generating... please wait';
+                    generateDraftBtn.disabled = true;
+                    generateDraftBtn.style.opacity = '0.7';
+
+                    fetch("{% url 'generate_reply_api' message.id %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrftoken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            const container = document.getElementById('draft-container');
+                            container.innerHTML = `<textarea class="form-control" rows="8" style="width: 100%; padding: 1rem; font-family: sans-serif; font-size: 0.9rem;">${data.draft}</textarea>`;
+                        } else {
+                            generateDraftBtn.innerHTML = originalText;
+                            generateDraftBtn.disabled = false;
+                            generateDraftBtn.style.opacity = '1';
+                            alert('Error: ' + data.message);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        generateDraftBtn.innerHTML = originalText;
+                        generateDraftBtn.disabled = false;
+                        generateDraftBtn.style.opacity = '1';
+                        alert('A network error occurred while generating the draft.');
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

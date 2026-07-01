@@ -1,68 +1,134 @@
-# Agentic AI Support Triage System 🚀
+# 1. Project Title
+**Agentic AI Customer Message Triage System**
 
-An industry-grade, autonomous Customer Support Triage system powered by **Llama 3** (via Groq). This application doesn't just wrap an LLM; it acts as an **Agentic AI** capable of dynamic function calling, real-time Knowledge Base retrieval, and robust fallback heuristics. 
+# 2. Overview
+The Agentic AI Triage System is an enterprise-grade customer support pipeline designed to process unstructured, sarcastic, angry, and multilingual customer requests. Instead of relying on a simple chatbot, this system uses an **Agentic LLM Architecture** (Llama 3 8B via Groq) to autonomously query local Knowledge Base policies, make priority classification decisions, and draft emails for human-in-the-loop approval. 
 
-Designed to seamlessly ingest, classify, and resolve noisy customer support pipelines at enterprise scale.
+# 3. Features
+* **Agentic Tool Calling:** The AI autonomously searches the local SQLite Knowledge Base database for company policies before finalizing triage decisions.
+* **Human-in-the-Loop Auto-Reply:** Safely generates highly contextual draft email responses based on strict company policies for human agents to review and approve.
+* **Self-Healing ML Fallback (k-NN):** If the primary cloud API fails, the system seamlessly degrades to an offline, auto-training Scikit-Learn model (Random Forest + k-Nearest Neighbors) to maintain 100% uptime.
+* **Real-Time Telemetry:** Dashboard tracking for latency times, token usage, and fractional-penny API costs.
+* **Multilingual Translation:** Automatically detects and translates non-English customer inputs.
 
-## 🌟 Key Features
+# 4. Screenshots
+> *(Add your screenshots here before final submission!)*
+* `![Dashboard View](placeholder)`
+* `![Triage JSON Output](placeholder)`
+* `![Auto-Reply Draft](placeholder)`
 
-1. **Agentic Tool Execution:** 
-   The core engine uses advanced function calling. Before classifying a ticket, the AI autonomously searches the internal Knowledge Base (KB) or looks up customer tiers to make policy-accurate decisions.
-2. **Dynamic Knowledge Base Manager:**
-   A fully integrated AJAX dashboard for administrators to add, edit, or delete custom KB policies. The AI's "brain" dynamically updates instantly based on these policies.
-3. **Resilient Rate-Limit Handling:** 
-   Built for high-volume pipelines. Incorporates automatic exponential backoff, API rate-limit sleep thresholds, and a hard-coded fallback heuristic engine if the API goes completely offline.
-4. **Seamless UI/UX:**
-   Dark-mode UI built with Vanilla CSS, featuring instant AJAX pagination, dynamic badging, statistical aggregates, and zero-reload architecture.
-5. **Robust Excel Data Ingestion:**
-   Import thousands of tickets instantly via Excel. Built with `io.BytesIO` memory streaming and fuzzy-header matching to parse messy spreadsheets flawlessly.
-6. **Built-in Ground-Truth Evaluation Suite:**
-   A dedicated CLI and UI testing framework (`evaluator.py`) to benchmark the AI's accuracy, latency, and cost-per-token against hand-labeled edge cases.
+# 5. Tech Stack
+* **Backend:** Python, Django 4.2+
+* **Frontend:** Vanilla JavaScript, HTML5, CSS3 (No heavy frontend frameworks)
+* **Database:** SQLite
+* **AI Provider:** Groq Cloud API (Model: `llama-3.1-8b-instant`)
+* **Machine Learning (Fallback):** Scikit-Learn (TF-IDF, Random Forest, NearestNeighbors)
 
-## 🛠️ Technology Stack
-* **Backend:** Python, Django
-* **AI Engine:** Groq API (Llama-3.1-8B-Instant) for 14,400+ Requests Per Minute speed.
-* **Frontend:** HTML5, Vanilla JavaScript (AJAX/Fetch), CSS3 (Dark/Glassmorphism UI)
-* **Database:** SQLite (Scalable to PostgreSQL)
-* **Data Processing:** OpenPyXL
+# 6. Project Structure
+```text
+ai_triage_system/
+│
+├── manage.py                   # Django CLI entrypoint
+├── requirements.txt            # Python dependencies
+├── .env                        # Environment variables (Ignored in Git)
+│
+├── triage_project/             # Main Django Configuration
+│   ├── settings.py
+│   ├── urls.py
+│
+├── triage_app/                 # Core Application
+│   ├── models.py               # SQLite Database Schema
+│   ├── views.py                # HTTP Controllers & AJAX endpoints
+│   ├── triage_engine.py        # Connects to Groq & parses Agentic Logic
+│   ├── ml_classifier.py        # Scikit-Learn offline fallback logic
+│   └── templates/              # HTML Frontend
+│
+└── ml_models/                  # (Auto-generated) Serialized .pkl ML Models
+```
 
-## 📁 Core Architecture (File Structure)
-
-* `triage_app/triage_engine.py` - **The Brain.** Contains the Llama 3 integration, strict JSON-schema enforcement, function calling tools (`search_knowledge_base`), and fallback rules.
-* `triage_app/evaluator.py` - **The Testing Suite.** Seeds the database with edge-case datasets (e.g. Sarcasm, Multi-Language, Vague) and evaluates the AI's classification accuracy.
-* `triage_app/views.py` - **The Controllers.** Handles the robust Excel data streams and AJAX JSON endpoints for the dashboard.
-* `triage_app/models.py` - **The Schema.** Defines `CustomerMessage`, `TriageResult`, `KBArticle`, and `GroundTruth`.
-* `triage_app/templates/triage_app/` - **The UI.** Contains the highly polished, asynchronous HTML/JS templates (`dashboard.html`, `detail.html`).
-
-## 🚀 Quick Start
-
-1. **Environment Setup:**
-   Ensure you have activated your virtual environment.
+# 7. Installation
+1. Clone the repository:
    ```bash
+   git clone https://github.com/akshat11shah/ai-triage-system.git
+   cd ai-triage-system
+   ```
+2. Create and activate a Virtual Environment:
+   ```bash
+   python -m venv .venv
    .venv\Scripts\activate
    ```
-2. **Install Dependencies:**
+3. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-3. **Environment Variables:**
-   Add your Groq API key to a `.env` file in the project root:
-   ```env
-   GROQ_API_KEY=gsk_your_key_here
+4. Run Database Migrations:
+   ```bash
+   python manage.py migrate
    ```
-4. **Run the Application:**
+
+# 8. Requirements
+Key dependencies include:
+* `Django>=4.2`
+* `groq>=0.9.0`
+* `scikit-learn>=1.0.0`
+* `joblib>=1.1.0`
+* `openpyxl>=3.1.0` *(For Excel ingestion)*
+
+# 9. Environment Variables
+Create a `.env` file in the root directory (same level as `manage.py`) and add your Groq API key:
+```env
+GROQ_API_KEY=gsk_your_api_key_here
+```
+
+# 10. Usage
+1. Start the local server:
    ```bash
    python manage.py runserver
    ```
-5. **Access the Dashboard:** 
-   Navigate to `http://127.0.0.1:8000/`
+2. Open `http://127.0.0.1:8000/` in your browser.
+3. Click **"Seed Mock Dataset"** in the top right to populate the database with realistic customer messages and KB Articles.
+4. Click **"Analyze & Triage"** on any message to trigger the Agentic AI flow.
 
-## 🧪 Running the Evaluation Suite
-To benchmark the AI's accuracy against the Ground Truth dataset:
-```bash
-python manage.py run_triage --eval
-```
-This triggers a pacing algorithm to test the model against edge cases, scoring Category, Priority, and Human-Review accuracy.
+# 11. Workflow
+1. **Input:** Customer message arrives via Excel import or UI form.
+2. **Analysis:** The `TriageEngine` parses the message and determines if it requires context.
+3. **Tool Calling:** The LLM fires a JSON payload requesting to query the `search_knowledge_base` function.
+4. **Resolution:** The backend runs the SQL query, injects the policy into the LLM context, and requests a final decision.
+5. **Output:** The LLM returns a strict JSON classification (Category, Priority, Summary) which is parsed and displayed on the UI.
+6. **Offline Mode:** If Step 2 fails, the `ml_classifier.py` intercepts the text and uses k-NN Vector Retrieval to predict the priority based on historical data.
 
----
-*Built for the Hackathon. Ready for Production.*
+# 12. Database
+* **CustomerMessage:** Stores raw inbound text, source, and timestamps.
+* **TriageResult:** Stores AI telemetry, final JSON classifications, cost, latency, and the generated Draft Auto-Reply.
+* **KBArticle:** Stores company policies used dynamically by the AI to resolve tickets without hallucinating.
+
+# 13. API (Optional)
+The system exposes several internal AJAX REST endpoints to power the Vanilla JS frontend without page reloads:
+* `POST /triage/api/triage/single/` - Runs triage on a specific message.
+* `POST /triage/api/generate_reply/` - Uses LLM to draft an email based on KB policies.
+* `GET /triage/api/dashboard_stats/` - Polls live telemetry data.
+
+# 14. Future Enhancements
+* Implementing a "Multi-Cloud Router" to instantly fallback to OpenAI's GPT-4o-mini before reverting to the local ML model.
+* Integrating IMAP/SMTP to fetch real emails directly into the dashboard.
+
+# 15. Known Issues
+* Requires a highly reliable internet connection for sub-second latency. If offline, the ML Fallback model requires at least 5 previously triaged messages in the database to train successfully.
+
+# 16. Contributing
+Contributions are welcome. Please open an issue first to discuss what you would like to change.
+
+# 17. License
+This project is licensed under the MIT License.
+
+# 18. Author
+**Akshat Shah**
+* [GitHub Profile](https://github.com/akshat11shah)
+
+# 19. Acknowledgements
+* Built for the 2026 Company Hackathon.
+* Powered by [Groq](https://groq.com/) for lightning-fast inference.
+* Llama 3 created by Meta.
+
+# 20. Version History
+* **v1.0.0** - Initial Hackathon Release (Agentic Tooling, ML Fallback, Dashboard)
